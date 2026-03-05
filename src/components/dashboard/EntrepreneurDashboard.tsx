@@ -52,9 +52,10 @@ export default function EntrepreneurDashboard() {
   const [newName, setNewName] = useState('');
   const [newSector, setNewSector] = useState('');
   const [creating, setCreating] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const finInputRef = useRef<HTMLInputElement>(null);
 
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
