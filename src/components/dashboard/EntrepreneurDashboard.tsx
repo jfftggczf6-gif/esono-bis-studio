@@ -53,6 +53,10 @@ export default function EntrepreneurDashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newSector, setNewSector] = useState('');
+  const [newCountry, setNewCountry] = useState("Côte d'Ivoire");
+  const [newCity, setNewCity] = useState('');
+  const [newLegalForm, setNewLegalForm] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -188,7 +192,15 @@ export default function EntrepreneurDashboard() {
     try {
       const { data, error } = await supabase
         .from('enterprises')
-        .insert({ user_id: user.id, name: newName.trim(), sector: newSector.trim() || null })
+        .insert({
+          user_id: user.id,
+          name: newName.trim(),
+          sector: newSector.trim() || null,
+          country: newCountry.trim() || "Côte d'Ivoire",
+          city: newCity.trim() || null,
+          legal_form: newLegalForm.trim() || null,
+          description: newDescription.trim() || null,
+        })
         .select().single();
       if (error) throw error;
 
@@ -285,17 +297,35 @@ export default function EntrepreneurDashboard() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle className="font-display">Nouvelle entreprise</DialogTitle></DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label>Nom de l'entreprise</Label>
+                  <div className="space-y-3 mt-4 max-h-[60vh] overflow-y-auto pr-1">
+                    <div className="space-y-1.5">
+                      <Label>Nom de l'entreprise *</Label>
                       <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ex: EcoBuild CI SARL" />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label>Secteur d'activité</Label>
                       <Input value={newSector} onChange={e => setNewSector(e.target.value)} placeholder="Ex: Recyclage, Agroalimentaire..." />
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Pays</Label>
+                        <Input value={newCountry} onChange={e => setNewCountry(e.target.value)} placeholder="Côte d'Ivoire" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Ville</Label>
+                        <Input value={newCity} onChange={e => setNewCity(e.target.value)} placeholder="Abidjan" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Forme juridique</Label>
+                      <Input value={newLegalForm} onChange={e => setNewLegalForm(e.target.value)} placeholder="Ex: SARL, SA, SAS..." />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Description</Label>
+                      <Input value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Décrivez brièvement votre activité..." />
+                    </div>
                     <Button className="w-full" onClick={createEnterprise} disabled={creating || !newName.trim()}>
-                      {creating ? 'Création...' : 'Créer'}
+                      {creating ? 'Création...' : 'Créer mon entreprise'}
                     </Button>
                   </div>
                 </DialogContent>
