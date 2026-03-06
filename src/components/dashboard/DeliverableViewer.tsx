@@ -18,7 +18,7 @@ export default function DeliverableViewer({ moduleCode, data }: DeliverableViewe
     case 'inputs': return <InputsViewer data={data} />;
     case 'framework': return <FrameworkViewerComponent data={data} />;
     case 'diagnostic': return <DiagnosticViewer data={data} />;
-    case 'plan_ovo': return <PlanOvoViewer data={data} />;
+    case 'plan_ovo': return <PlanOvoViewerComponent data={data} />;
     case 'business_plan': return <BusinessPlanViewer data={data} />;
     case 'odd': return <OddViewer data={data} />;
     default: return <GenericJsonViewer data={data} />;
