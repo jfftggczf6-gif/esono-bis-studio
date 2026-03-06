@@ -443,9 +443,6 @@ export default function EntrepreneurDashboard() {
           <span className="text-sm text-foreground">
             {profile?.full_name} · <span className="text-muted-foreground">{profile?.email}</span>
           </span>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/formations')}>
-            <BookOpen className="h-4 w-4" /> Formations
-          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" /> Déconnexion
           </Button>
