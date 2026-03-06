@@ -437,11 +437,18 @@ serve(async (req) => {
       });
     }
 
-    // XLSX format
+    // XLSX format - real Office Open XML
     if (format === "xlsx") {
-      const xlsxData = generateXlsx(deliv.data, title);
+      const xlsxBuilders: Record<string, (d: any) => any> = {
+        inputs_data: buildInputsXlsx,
+        framework_data: buildFrameworkXlsx,
+        plan_ovo: buildPlanOvoXlsx,
+      };
+      const builder = xlsxBuilders[deliverableType];
+      const sheets = builder ? builder(deliv.data) : [{ name: title.substring(0, 31), headers: ['Champ', 'Valeur'], rows: Object.entries(deliv.data as Record<string, any>).filter(([_, v]) => typeof v !== 'object').map(([k, v]) => [k, String(v)]) }];
+      const xlsxData = await generateXlsxFile(sheets);
       return new Response(xlsxData, {
-        headers: { ...corsHeaders, "Content-Type": "application/vnd.ms-excel", "Content-Disposition": `attachment; filename="${safeName}_${deliverableType}.xls"` },
+        headers: { ...corsHeaders, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${safeName}_${deliverableType}.xlsx"` },
       });
     }
 
