@@ -322,12 +322,12 @@ export default function PlanOvoViewer({ data }: { data: any }) {
 
       {/* Break-even */}
       {data.break_even_year && (
-        <Card className="border-green-500/30 bg-green-500/5">
+        <Card className="border-success/30 bg-success/5">
           <CardContent className="py-3 px-4 flex items-center gap-3">
             <span className="text-2xl">🎯</span>
             <div>
-              <p className="text-xs font-semibold text-green-700 dark:text-green-400">Point mort atteint en</p>
-              <p className="text-lg font-bold text-green-600 dark:text-green-300">{data.break_even_year}</p>
+              <p className="text-xs font-semibold text-success">Point mort atteint en</p>
+              <p className="text-lg font-bold text-success">{data.break_even_year}</p>
             </div>
           </CardContent>
         </Card>
