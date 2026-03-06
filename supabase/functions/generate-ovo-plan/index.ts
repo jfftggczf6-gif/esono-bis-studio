@@ -1135,12 +1135,6 @@ function buildCellWrites(json: Record<string, any>): CellWrite[] {
 // ÉTAPE 4 : INJECTION DANS LE XLSM (manipulation ZIP/XML)
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * Stratégie : manipulation directe du ZIP/XML.
- * On ne passe PAS par ExcelJS pour éviter la corruption VBA.
- * On lit le fichier ZIP, on modifie uniquement les feuilles cibles,
- * on réécrit les valeurs numériques/string directement dans le XML.
- */
 async function injectIntoXlsm(
   templateBuffer: ArrayBuffer,
   writes: CellWrite[]
@@ -1153,111 +1147,123 @@ async function injectIntoXlsm(
     bySheet[cw.sheet].push(cw);
   }
 
-  // Lire le ZIP
-  const zipEntries = await readZip(new Uint8Array(templateBuffer));
+  // Lire le ZIP (retourne données décompressées + données compressées originales)
+  const zipResult = await readZip(new Uint8Array(templateBuffer));
+  const modifiedFiles = new Set<string>();
 
   // Modifier chaque feuille concernée
   for (const [sheetName, sheetWrites] of Object.entries(bySheet)) {
     const xmlPath = SHEET_FILES[sheetName];
-    if (!xmlPath || !zipEntries[xmlPath]) {
+    if (!xmlPath || !zipResult.entries[xmlPath]) {
       console.warn(`[inject] Sheet ${sheetName} not found at ${xmlPath}`);
       continue;
     }
 
-    let xml = new TextDecoder().decode(zipEntries[xmlPath]);
+    let xml = new TextDecoder().decode(zipResult.entries[xmlPath]);
     xml = applyWritesToXml(xml, sheetWrites);
-    zipEntries[xmlPath] = new TextEncoder().encode(xml);
+    zipResult.entries[xmlPath] = new TextEncoder().encode(xml);
+    modifiedFiles.add(xmlPath);
 
     console.log(`[inject] ${sheetName}: ${sheetWrites.length} cells updated`);
   }
 
-  // Reconstruire le ZIP
-  return await buildZip(zipEntries, new Uint8Array(templateBuffer));
+  // Reconstruire le ZIP (ne recompresse que les fichiers modifiés)
+  return await buildZip(zipResult, modifiedFiles);
 }
 
 /**
- * Applique les écritures dans le XML d'une feuille.
- * Gère les types : number, string (shared strings), date (serial Excel).
- *
- * Stratégie XML :
- *   - Trouver la cellule existante par son ref (ex: "J5")
- *   - Si existe : remplacer la valeur <v>...</v>
- *   - Si n'existe pas : insérer la cellule dans la bonne ligne <row>
+ * Batch XML update: single-pass parsing instead of per-cell regex.
+ * O(xml_length + cells) instead of O(cells × xml_length).
  */
 function applyWritesToXml(xml: string, writes: CellWrite[]): string {
+  // Index writes by "row:col" for O(1) lookup
+  const writeMap = new Map<string, CellWrite>();
+  const rowsNeeded = new Set<number>();
   for (const cw of writes) {
     if (cw.value === null || cw.value === undefined) continue;
-
     const cellRef = colNumToLetter(cw.col) + cw.row;
-
-    if (cw.type === "string") {
-      // Pour les strings : utiliser inline string (t="inlineStr")
-      // C'est plus simple que shared strings et compatible avec ExcelJS
-      const strValue = String(cw.value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      xml = setCellValue(xml, cellRef, cw.row, strValue, "inlineStr");
-    } else {
-      // Nombre ou date (serial)
-      const numValue = typeof cw.value === "number" ? cw.value : parseFloat(String(cw.value));
-      xml = setCellValue(xml, cellRef, cw.row, String(numValue), "number");
-    }
+    writeMap.set(cellRef, cw);
+    rowsNeeded.add(cw.row);
   }
+
+  if (writeMap.size === 0) return xml;
+
+  // Track which writes were applied (to handle missing rows)
+  const applied = new Set<string>();
+
+  // Process existing rows — replace matching cells, track applied
+  xml = xml.replace(/<row\b([^>]*)>([\s\S]*?)<\/row>/g, (fullMatch, attrs, content) => {
+    const rMatch = attrs.match(/r="(\d+)"/);
+    if (!rMatch) return fullMatch;
+    const rowNum = parseInt(rMatch[1]);
+
+    if (!rowsNeeded.has(rowNum)) return fullMatch;
+
+    // Collect writes for this row
+    const rowWrites = new Map<string, CellWrite>();
+    for (const [ref, cw] of writeMap) {
+      if (cw.row === rowNum) rowWrites.set(ref, cw);
+    }
+    if (rowWrites.size === 0) return fullMatch;
+
+    // Replace existing cells
+    let newContent = content.replace(
+      /<c r="([A-Z]+\d+)"([^>]*)>([\s\S]*?)<\/c>/g,
+      (cellMatch: string, ref: string, cellAttrs: string, cellContent: string) => {
+        const cw = rowWrites.get(ref);
+        if (!cw) return cellMatch;
+        // Skip formula cells
+        if (cellContent.includes("<f")) {
+          console.warn(`[inject] Skipping formula cell ${ref}`);
+          applied.add(ref);
+          return cellMatch;
+        }
+        applied.add(ref);
+        return buildCellXml(ref, cw);
+      }
+    );
+
+    // Insert new cells that didn't exist
+    for (const [ref, cw] of rowWrites) {
+      if (applied.has(ref)) continue;
+      applied.add(ref);
+      const newCell = buildCellXml(ref, cw);
+      newContent = insertCellInRow(newContent, newCell, ref);
+    }
+
+    return `<row${attrs}>${newContent}</row>`;
+  });
+
+  // Insert entirely new rows for remaining writes
+  const remaining = new Map<number, CellWrite[]>();
+  for (const [ref, cw] of writeMap) {
+    if (applied.has(ref)) continue;
+    if (!remaining.has(cw.row)) remaining.set(cw.row, []);
+    remaining.get(cw.row)!.push(cw);
+  }
+
+  if (remaining.size > 0) {
+    const newRows: string[] = [];
+    for (const [rowNum, writes] of [...remaining.entries()].sort((a, b) => a[0] - b[0])) {
+      const cells = writes
+        .sort((a, b) => a.col - b.col)
+        .map(cw => buildCellXml(colNumToLetter(cw.col) + cw.row, cw))
+        .join("");
+      newRows.push(`<row r="${rowNum}">${cells}</row>`);
+    }
+    xml = xml.replace(/<\/sheetData>/, newRows.join("") + "</sheetData>");
+  }
+
   return xml;
 }
 
-/**
- * Met à jour ou insère une cellule dans le XML de la feuille.
- */
-function setCellValue(
-  xml: string,
-  cellRef: string,
-  rowNum: number,
-  value: string,
-  type: "number" | "inlineStr"
-): string {
-
-  // Attribut t= pour le type
-  const tAttr = type === "inlineStr" ? ' t="inlineStr"' : "";
-  // Contenu de la cellule
-  const cellContent = type === "inlineStr"
-    ? `<is><t>${value}</t></is>`
-    : `<v>${value}</v>`;
-
-  // Pattern pour trouver la cellule existante
-  const existingPattern = new RegExp(
-    `<c r="${cellRef}"[^>]*>(?:<f[^>]*>[^<]*</f>)?(?:<v>[^<]*</v>|<is>.*?</is>)?(?:<extLst>.*?</extLst>)?</c>`,
-    "s"
-  );
-
-  const newCell = `<c r="${cellRef}"${tAttr}>${cellContent}</c>`;
-
-  if (existingPattern.test(xml)) {
-    // La cellule existe — la remplacer uniquement si elle ne contient pas de formule
-    return xml.replace(existingPattern, (match) => {
-      // Ne pas écraser les formules (<f> tag)
-      if (match.includes("<f")) {
-        console.warn(`[inject] Skipping formula cell ${cellRef}`);
-        return match;
-      }
-      return newCell;
-    });
+function buildCellXml(ref: string, cw: CellWrite): string {
+  if (cw.type === "string") {
+    const strValue = String(cw.value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<c r="${ref}" t="inlineStr"><is><t>${strValue}</t></is></c>`;
   }
-
-  // La cellule n'existe pas — l'insérer dans la bonne ligne
-  // Chercher la ligne correspondante
-  const rowPattern = new RegExp(`(<row[^>]*r="${rowNum}"[^>]*>)(.*?)(</row>)`, "s");
-
-  if (rowPattern.test(xml)) {
-    return xml.replace(rowPattern, (_, open, content, close) => {
-      // Insérer la cellule à la bonne position dans la ligne (ordre alphabétique des refs)
-      const inserted = insertCellInRow(content, newCell, cellRef);
-      return `${open}${inserted}${close}`;
-    });
-  }
-
-  // La ligne n'existe pas non plus — insérer une nouvelle ligne
-  const sheetDataEndPattern = /(<\/sheetData>)/;
-  const newRow = `<row r="${rowNum}">${newCell}</row>`;
-  return xml.replace(sheetDataEndPattern, `${newRow}$1`);
+  const numValue = typeof cw.value === "number" ? cw.value : parseFloat(String(cw.value));
+  return `<c r="${ref}"><v>${numValue}</v></c>`;
 }
 
 /**
@@ -1283,17 +1289,25 @@ function insertCellInRow(rowContent: string, newCell: string, newRef: string): s
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// UTILITAIRES ZIP
+// UTILITAIRES ZIP (optimisé: conserve les données compressées originales)
 // ─────────────────────────────────────────────────────────────────────
 
-type ZipEntries = Record<string, Uint8Array>;
+interface ZipReadResult {
+  entries: Record<string, Uint8Array>;          // décompressées
+  originalCompressed: Record<string, {          // compressées originales
+    data: Uint8Array;
+    crc: number;
+    uncompSize: number;
+    method: number;
+  }>;
+}
 
-async function readZip(data: Uint8Array): Promise<ZipEntries> {
-  // Lecture manuelle du format ZIP (End of Central Directory)
+async function readZip(data: Uint8Array): Promise<ZipReadResult> {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  const entries: ZipEntries = {};
+  const entries: Record<string, Uint8Array> = {};
+  const originalCompressed: ZipReadResult["originalCompressed"] = {};
 
-  // Trouver le End of Central Directory (signature 0x06054b50)
+  // Trouver le End of Central Directory
   let eocdOffset = -1;
   for (let i = data.length - 22; i >= 0; i--) {
     if (view.getUint32(i, true) === 0x06054b50) {
@@ -1309,9 +1323,10 @@ async function readZip(data: Uint8Array): Promise<ZipEntries> {
   let pos = centralDirOffset;
 
   while (pos < centralDirOffset + centralDirSize) {
-    if (view.getUint32(pos, true) !== 0x02014b50) break; // Central dir signature
+    if (view.getUint32(pos, true) !== 0x02014b50) break;
 
     const compMethod    = view.getUint16(pos + 10, true);
+    const crcVal        = view.getUint32(pos + 16, true);
     const compSize      = view.getUint32(pos + 20, true);
     const uncompSize    = view.getUint32(pos + 24, true);
     const fileNameLen   = view.getUint16(pos + 28, true);
@@ -1322,7 +1337,6 @@ async function readZip(data: Uint8Array): Promise<ZipEntries> {
     const fileName = new TextDecoder().decode(data.slice(pos + 46, pos + 46 + fileNameLen));
     pos += 46 + fileNameLen + extraLen + commentLen;
 
-    // Lire le local file header
     const localView      = new DataView(data.buffer, data.byteOffset + localOffset);
     const localFileNameLen = localView.getUint16(26, true);
     const localExtraLen    = localView.getUint16(28, true);
@@ -1330,11 +1344,17 @@ async function readZip(data: Uint8Array): Promise<ZipEntries> {
 
     const compData = data.slice(dataStart, dataStart + compSize);
 
+    // Store original compressed data for later reuse
+    originalCompressed[fileName] = {
+      data: compData,
+      crc: crcVal,
+      uncompSize,
+      method: compMethod,
+    };
+
     if (compMethod === 0) {
-      // Stored (non compressé)
       entries[fileName] = compData;
     } else if (compMethod === 8) {
-      // Deflate
       const ds = new DecompressionStream("deflate-raw");
       const writer = ds.writable.getWriter();
       const reader = ds.readable.getReader();
@@ -1360,48 +1380,64 @@ async function readZip(data: Uint8Array): Promise<ZipEntries> {
     }
   }
 
-  return entries;
+  return { entries, originalCompressed };
 }
 
-async function buildZip(entries: ZipEntries, original: Uint8Array): Promise<ArrayBuffer> {
-  // Reconstruire le ZIP en recompressant les fichiers modifiés
+async function buildZip(zipResult: ZipReadResult, modifiedFiles: Set<string>): Promise<ArrayBuffer> {
+  const { entries, originalCompressed } = zipResult;
   const parts: Uint8Array[] = [];
   const centralDir: Uint8Array[] = [];
   let offset = 0;
 
-  for (const [name, data] of Object.entries(entries)) {
+  for (const [name, uncompData] of Object.entries(entries)) {
     const nameBytes = new TextEncoder().encode(name);
+    let compData: Uint8Array;
+    let crcVal: number;
+    let compMethod: number;
 
-    // Compresser avec deflate-raw
-    const cs = new CompressionStream("deflate-raw");
-    const writer = cs.writable.getWriter();
-    const reader = cs.readable.getReader();
+    if (modifiedFiles.has(name)) {
+      // Modified file: recompress
+      const cs = new CompressionStream("deflate-raw");
+      const writer = cs.writable.getWriter();
+      const reader = cs.readable.getReader();
 
-    writer.write(data);
-    writer.close();
+      writer.write(uncompData);
+      writer.close();
 
-    const chunks: Uint8Array[] = [];
-    let done = false;
-    while (!done) {
-      const { value, done: d } = await reader.read();
-      if (value) chunks.push(value);
-      done = d;
+      const chunks: Uint8Array[] = [];
+      let done = false;
+      while (!done) {
+        const { value, done: d } = await reader.read();
+        if (value) chunks.push(value);
+        done = d;
+      }
+
+      compData = mergeUint8Arrays(chunks);
+      crcVal = crc32(uncompData);
+      compMethod = 8;
+    } else if (originalCompressed[name]) {
+      // Unmodified: reuse original compressed bytes directly
+      const orig = originalCompressed[name];
+      compData = orig.data;
+      crcVal = orig.crc;
+      compMethod = orig.method;
+    } else {
+      // Fallback: compress
+      compData = uncompData;
+      crcVal = crc32(uncompData);
+      compMethod = 0;
     }
 
-    const compData = mergeUint8Arrays(chunks);
-    const crc = crc32(data);
-
     // Local file header
-    const localHeader = buildLocalHeader(nameBytes, compData.length, data.length, crc);
+    const localHeader = buildLocalHeader(nameBytes, compData.length, uncompData.length, crcVal, compMethod);
     parts.push(localHeader, nameBytes, compData);
 
     // Central directory entry
-    centralDir.push(buildCentralDirEntry(nameBytes, compData.length, data.length, crc, offset));
+    centralDir.push(buildCentralDirEntry(nameBytes, compData.length, uncompData.length, crcVal, offset, compMethod));
 
     offset += localHeader.length + nameBytes.length + compData.length;
   }
 
-  // Central directory + EOCD
   const cdData = mergeUint8Arrays(centralDir);
   const eocd   = buildEOCD(centralDir.length, cdData.length, offset);
 
@@ -1409,43 +1445,43 @@ async function buildZip(entries: ZipEntries, original: Uint8Array): Promise<Arra
   return mergeUint8Arrays(allParts).buffer;
 }
 
-function buildLocalHeader(name: Uint8Array, compSize: number, uncompSize: number, crc: number): Uint8Array {
+function buildLocalHeader(name: Uint8Array, compSize: number, uncompSize: number, crc: number, method = 8): Uint8Array {
   const buf = new Uint8Array(30);
   const view = new DataView(buf.buffer);
-  view.setUint32(0, 0x04034b50, true);  // Signature
-  view.setUint16(4, 20, true);           // Version needed
-  view.setUint16(6, 0, true);            // Flags
-  view.setUint16(8, 8, true);            // Compression method (deflate)
-  view.setUint16(10, 0, true);           // Mod time
-  view.setUint16(12, 0, true);           // Mod date
-  view.setUint32(14, crc, true);         // CRC-32
-  view.setUint32(18, compSize, true);    // Compressed size
-  view.setUint32(22, uncompSize, true);  // Uncompressed size
-  view.setUint16(26, name.length, true); // Filename length
-  view.setUint16(28, 0, true);           // Extra length
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, method, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, 0, true);
+  view.setUint32(14, crc, true);
+  view.setUint32(18, compSize, true);
+  view.setUint32(22, uncompSize, true);
+  view.setUint16(26, name.length, true);
+  view.setUint16(28, 0, true);
   return buf;
 }
 
-function buildCentralDirEntry(name: Uint8Array, compSize: number, uncompSize: number, crc: number, localOffset: number): Uint8Array {
+function buildCentralDirEntry(name: Uint8Array, compSize: number, uncompSize: number, crc: number, localOffset: number, method = 8): Uint8Array {
   const buf = new Uint8Array(46 + name.length);
   const view = new DataView(buf.buffer);
-  view.setUint32(0, 0x02014b50, true);   // Signature
-  view.setUint16(4, 20, true);           // Version made by
-  view.setUint16(6, 20, true);           // Version needed
-  view.setUint16(8, 0, true);            // Flags
-  view.setUint16(10, 8, true);           // Compression
-  view.setUint16(12, 0, true);           // Mod time
-  view.setUint16(14, 0, true);           // Mod date
-  view.setUint32(16, crc, true);         // CRC
-  view.setUint32(20, compSize, true);    // Comp size
-  view.setUint32(24, uncompSize, true);  // Uncomp size
-  view.setUint16(28, name.length, true); // Filename len
-  view.setUint16(30, 0, true);           // Extra len
-  view.setUint16(32, 0, true);           // Comment len
-  view.setUint16(34, 0, true);           // Disk start
-  view.setUint16(36, 0, true);           // Internal attrs
-  view.setUint32(38, 0, true);           // External attrs
-  view.setUint32(42, localOffset, true); // Local offset
+  view.setUint32(0, 0x02014b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 20, true);
+  view.setUint16(8, 0, true);
+  view.setUint16(10, method, true);
+  view.setUint16(12, 0, true);
+  view.setUint16(14, 0, true);
+  view.setUint32(16, crc, true);
+  view.setUint32(20, compSize, true);
+  view.setUint32(24, uncompSize, true);
+  view.setUint16(28, name.length, true);
+  view.setUint16(30, 0, true);
+  view.setUint16(32, 0, true);
+  view.setUint16(34, 0, true);
+  view.setUint16(36, 0, true);
+  view.setUint32(38, 0, true);
+  view.setUint32(42, localOffset, true);
   buf.set(name, 46);
   return buf;
 }
@@ -1453,14 +1489,14 @@ function buildCentralDirEntry(name: Uint8Array, compSize: number, uncompSize: nu
 function buildEOCD(numEntries: number, cdSize: number, cdOffset: number): Uint8Array {
   const buf = new Uint8Array(22);
   const view = new DataView(buf.buffer);
-  view.setUint32(0, 0x06054b50, true);  // Signature
-  view.setUint16(4, 0, true);            // Disk number
-  view.setUint16(6, 0, true);            // CD disk
-  view.setUint16(8, numEntries, true);   // Entries on disk
-  view.setUint16(10, numEntries, true);  // Total entries
-  view.setUint32(12, cdSize, true);      // CD size
-  view.setUint32(16, cdOffset, true);    // CD offset
-  view.setUint16(20, 0, true);           // Comment length
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, numEntries, true);
+  view.setUint16(10, numEntries, true);
+  view.setUint32(12, cdSize, true);
+  view.setUint32(16, cdOffset, true);
+  view.setUint16(20, 0, true);
   return buf;
 }
 
@@ -1488,7 +1524,6 @@ function refToColNum(ref: string): number {
 }
 
 function excelDateSerial(date: Date): number {
-  // Excel serial date : jours depuis le 30 décembre 1899
   const epoch = new Date(1899, 11, 30);
   const diff  = date.getTime() - epoch.getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -1505,16 +1540,8 @@ function mergeUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   return result;
 }
 
-function crc32(data: Uint8Array): number {
-  const table = buildCRC32Table();
-  let crc = 0xFFFFFFFF;
-  for (const byte of data) {
-    crc = (crc >>> 8) ^ table[(crc ^ byte) & 0xFF];
-  }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
-
-function buildCRC32Table(): Uint32Array {
+// Module-level cached CRC32 table (computed once)
+const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
     let c = i;
@@ -1524,6 +1551,14 @@ function buildCRC32Table(): Uint32Array {
     table[i] = c;
   }
   return table;
+})();
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xFFFFFFFF;
+  for (const byte of data) {
+    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ byte) & 0xFF];
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
 function sanitize(str: string): string {
