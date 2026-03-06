@@ -18,6 +18,7 @@ import {
   BookOpen, Lock, FolderPlus
 } from 'lucide-react';
 import BmcViewer from './BmcViewer';
+import SicViewer from './SicViewer';
 import DeliverableViewer from './DeliverableViewer';
 
 const MODULE_CONFIG = [
@@ -437,6 +438,8 @@ export default function EntrepreneurDashboard() {
               <div className="p-6">
                 {selectedModule === 'bmc' ? (
                   <BmcViewer data={selectedDeliv.data} />
+                ) : selectedModule === 'sic' ? (
+                  <SicViewer data={selectedDeliv.data} />
                 ) : (
                   <DeliverableViewer moduleCode={selectedModule} data={selectedDeliv.data} />
                 )}
