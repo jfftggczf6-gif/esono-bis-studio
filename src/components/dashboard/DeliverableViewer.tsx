@@ -510,42 +510,7 @@ function InputsViewer({ data }: { data: any }) {
   );
 }
 
-// ===== FRAMEWORK VIEWER =====
-function FrameworkViewer({ data }: { data: any }) {
-  const ratios = data.ratios || {};
-
-  return (
-    <div className="space-y-4">
-      <ScoreHeader title="Framework Analyse Financière" score={data.score} subtitle={data.capacite_investissement} />
-
-      {Object.entries(ratios).map(([category, ratioGroup]: [string, any]) => (
-        <Card key={category}><CardContent className="py-4">
-          <h4 className="text-xs font-bold text-primary mb-2 capitalize">{category.replace(/_/g, ' ')}</h4>
-          <div className="space-y-2">
-            {Object.entries(ratioGroup).map(([key, val]: [string, any]) => (
-              <div key={key} className="flex items-center justify-between text-xs p-2 rounded bg-muted/30">
-                <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{val?.valeur || val}</span>
-                  {val?.verdict && (
-                    <Badge variant="outline" className={`text-[9px] ${
-                      val.verdict === 'Bon' ? 'text-success border-success/30' :
-                      val.verdict === 'Faible' ? 'text-destructive border-destructive/30' :
-                      'text-warning border-warning/30'
-                    }`}>{val.verdict}</Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent></Card>
-      ))}
-
-      <StrengthsWeaknesses strengths={data.points_forts} weaknesses={data.points_faibles} />
-      <RecommendationsList items={data.recommandations} />
-    </div>
-  );
-}
+// ===== FRAMEWORK VIEWER (now in separate file: FrameworkViewer.tsx) =====
 
 // ===== DIAGNOSTIC VIEWER =====
 function DiagnosticViewer({ data }: { data: any }) {
