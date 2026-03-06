@@ -262,10 +262,36 @@ export default function EntrepreneurDashboard() {
 
   const handleSignOut = async () => { await signOut(); navigate('/login'); };
 
+  const pollForOvoCompletion = async (enterpriseId: string, requestId: string, startedAt: string): Promise<{ url: string; fileName: string } | null> => {
+    const maxAttempts = 60; // 60 × 3s = 3 min max
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const { data: d } = await supabase
+        .from('deliverables')
+        .select('file_url, data')
+        .eq('enterprise_id', enterpriseId)
+        .eq('type', 'plan_ovo_excel' as any)
+        .maybeSingle();
+      if (!d?.data || typeof d.data !== 'object') continue;
+      const meta = d.data as Record<string, any>;
+      if (meta.request_id !== requestId && !(meta.generated_at && meta.generated_at > startedAt)) continue;
+      if (meta.status === 'completed' && d.file_url) {
+        return { url: d.file_url, fileName: meta.file_name || 'PlanFinancierOVO.xlsm' };
+      }
+      if (meta.status === 'failed') {
+        throw new Error(meta.error || 'La génération a échoué côté serveur');
+      }
+      // still processing, continue polling
+    }
+    throw new Error('Délai dépassé — la génération prend trop de temps');
+  };
+
   const handleGenerateOvoPlan = async () => {
     if (!enterprise) return;
     setGeneratingOvoPlan(true);
     setOvoDownloadUrl(null);
+    const requestId = crypto.randomUUID();
+    const startedAt = new Date().toISOString();
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non authentifié");
@@ -379,6 +405,8 @@ export default function EntrepreneurDashboard() {
 
       const payload = {
         user_id: user?.id,
+        enterprise_id: enterprise.id,
+        request_id: requestId,
         company: enterprise.name,
         country: enterprise.country || "IVORY COAST",
         sector: enterprise.sector || "",
@@ -398,37 +426,43 @@ export default function EntrepreneurDashboard() {
         diagnostic_data: diagnosticData,
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-ovo-plan`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify(payload),
-        }
-      );
+      let downloadUrl: string | null = null;
+      let fileName = 'PlanFinancierOVO.xlsm';
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Erreur inconnue' }));
-        throw new Error(err.error || 'La génération a échoué');
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-ovo-plan`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: 'Erreur inconnue' }));
+          throw new Error(err.error || 'La génération a échoué');
+        }
+
+        const result = await response.json();
+        downloadUrl = result.download_url;
+        fileName = result.file_name || fileName;
+      } catch (fetchErr: any) {
+        // Network error / connection closed — fall back to polling
+        console.warn('[OVO] HTTP failed, falling back to polling:', fetchErr.message);
+        toast.info('Connexion interrompue, vérification du statut en cours...');
+        const polled = await pollForOvoCompletion(enterprise.id, requestId, startedAt);
+        if (polled) {
+          downloadUrl = polled.url;
+          fileName = polled.fileName;
+        }
       }
 
-      const result = await response.json();
-      const downloadUrl = result.download_url;
-      setOvoDownloadUrl(downloadUrl);
+      if (downloadUrl) {
+        setOvoDownloadUrl(downloadUrl);
+        toast.success('Plan Financier OVO généré avec succès !');
+      }
 
-      // Save to deliverables
-      await supabase.from('deliverables').upsert(
-        {
-          enterprise_id: enterprise.id,
-          type: 'plan_ovo_excel' as any,
-          file_url: downloadUrl,
-          ai_generated: true,
-          data: { file_name: result.file_name || 'PlanFinancierOVO.xlsm', generated_at: new Date().toISOString() },
-        },
-        { onConflict: 'enterprise_id,type' }
-      );
-
-      toast.success('Plan Financier OVO généré avec succès !');
       await fetchData();
     } catch (err: any) {
       toast.error(err.message || 'La génération a échoué, veuillez réessayer');
