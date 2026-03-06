@@ -262,8 +262,6 @@ async function callClaudeAPI(data: EntrepreneurData): Promise<Record<string, unk
         }
         throw parseErr;
       }
-      console.log(`[Claude] OK — products: ${parsed.products?.length}, services: ${parsed.services?.length}`);
-      return parsed;
 
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
