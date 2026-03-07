@@ -174,7 +174,11 @@ serve(async (req) => {
     ));
     
     // Normalize: fix years, ensure consistency, fill gaps
-    const data = normalizePlanOvo(rawData);
+    let data = normalizePlanOvo(rawData);
+    
+    // Enforce Framework constraints: overwrite projections with exact Framework values
+    const frameworkData = allData.framework;
+    data = enforceFrameworkConstraints(data, frameworkData);
 
     await saveDeliverable(ctx.supabase, ctx.enterprise_id, "plan_ovo", data, "plan_ovo");
 
