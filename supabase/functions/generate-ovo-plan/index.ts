@@ -268,6 +268,8 @@ Deno.serve(async (req: Request) => {
             request_id: requestId,
             file_name: outputFileName,
             generated_at: new Date().toISOString(),
+            constraint_source: data.plan_ovo_data ? "prev_plan_sanitized" : "framework_fallback",
+            phase: "completed",
           },
         },
         { onConflict: "enterprise_id,type" }
