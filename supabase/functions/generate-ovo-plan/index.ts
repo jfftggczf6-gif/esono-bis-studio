@@ -161,7 +161,8 @@ Deno.serve(async (req: Request) => {
           enterprise_id: enterpriseId,
           type: "plan_ovo_excel",
           ai_generated: true,
-          data: { status: "processing", request_id: requestId, started_at: new Date().toISOString() },
+          file_url: null, // Clear old file URL to avoid stale downloads
+          data: { status: "processing", request_id: requestId, started_at: new Date().toISOString(), phase: "init", attempt: 0 },
         },
         { onConflict: "enterprise_id,type" }
       );
