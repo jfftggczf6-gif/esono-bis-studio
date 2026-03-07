@@ -43,7 +43,25 @@ const DELIVERABLE_CONFIG = [
 ];
 
 export default function EntrepreneurDashboard() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, session: authSession, signOut } = useAuth();
+
+  /** Robust access token retrieval: context → getSession → refreshSession → redirect */
+  const getValidAccessToken = async (): Promise<string> => {
+    // 1. Try auth context session first (most reliable in-memory source)
+    if (authSession?.access_token) return authSession.access_token;
+
+    // 2. Try Supabase getSession
+    const { data: { session: s } } = await supabase.auth.getSession();
+    if (s?.access_token) return s.access_token;
+
+    // 3. Force refresh
+    const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+    if (refreshed?.access_token) return refreshed.access_token;
+
+    // 4. All failed — redirect to login
+    navigate('/login');
+    throw new Error("Session expirée — redirection vers la connexion");
+  };
   const navigate = useNavigate();
   const [enterprise, setEnterprise] = useState<any>(null);
   const [modules, setModules] = useState<any[]>([]);
