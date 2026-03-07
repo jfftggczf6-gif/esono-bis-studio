@@ -201,7 +201,7 @@ export async function fillOddExcelTemplate(
 
   const { data: fileData, error } = await supabase.storage
     .from("templates")
-    .download("ODD_template.xlsx");
+    .download("ODD_template.xlsm");
 
   if (error || !fileData) {
     throw new Error(`Template ODD_template.xlsx introuvable: ${error?.message ?? "absent"}`);
