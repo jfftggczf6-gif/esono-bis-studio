@@ -303,8 +303,7 @@ export default function EntrepreneurDashboard() {
     if (!enterprise) return;
     setGeneratingModule(moduleCode);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Non authentifié");
+      const token = await getValidAccessToken();
       const fnMap: Record<string, string> = {
         bmc: 'generate-bmc', sic: 'generate-sic', inputs: 'generate-inputs',
         framework: 'generate-framework', diagnostic: 'generate-diagnostic',
