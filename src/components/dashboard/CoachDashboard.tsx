@@ -1148,6 +1148,34 @@ export default function CoachDashboard() {
                   <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleDownloadReport(ent)}>
                     <Download className="h-3 w-3" />
                   </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {ent.user_id === user?.id ? 'Supprimer' : 'Détacher'} {ent.name} ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {ent.user_id === user?.id
+                            ? "Cette entreprise et tous ses livrables seront définitivement supprimés."
+                            : "L'entreprise sera retirée de votre liste mais restera accessible à l'entrepreneur."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteEnterprise(ent)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {ent.user_id === user?.id ? 'Supprimer' : 'Détacher'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             );
