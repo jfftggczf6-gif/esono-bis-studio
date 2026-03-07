@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import FrameworkViewerComponent from './FrameworkViewer';
 import PlanOvoViewerComponent from './PlanOvoViewer';
 import { OddViewer as OddViewerComponent } from './OddViewer';
