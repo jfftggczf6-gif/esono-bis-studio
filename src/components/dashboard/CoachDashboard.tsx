@@ -1444,6 +1444,43 @@ export default function CoachDashboard() {
               })}
             </div>
 
+            {/* Contextual download bar for selected module in Livrables tab */}
+            {selectedDeliv && (
+              <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/30">
+                <span className="text-sm font-medium">{MODULE_CONFIG.find(m => m.code === selectedModule)?.title}</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1"
+                    onClick={() => handleDownloadCoach(DELIV_MAP[selectedModule], 'html', ent.id)}>
+                    <Download className="h-3 w-3" /> HTML
+                  </Button>
+                  {selectedModule === 'framework' && (
+                    <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1"
+                      onClick={() => handleDownloadCoach('framework_data', 'xlsx', ent.id)}>
+                      <Download className="h-3 w-3" /> XLSX
+                    </Button>
+                  )}
+                  {selectedModule === 'plan_ovo' && entDelivs.find((x: any) => x.type === 'plan_ovo_excel') && (
+                    <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1"
+                      onClick={() => handleDownloadOvoCoach(ent.id, entDelivs)}>
+                      <Download className="h-3 w-3" /> XLSM
+                    </Button>
+                  )}
+                  {selectedModule === 'business_plan' && selectedDeliv?.data?._meta?.download_url && (
+                    <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1"
+                      onClick={() => handleDownloadBpWordCoach(selectedDeliv.data._meta.download_url, ent.name)}>
+                      <Download className="h-3 w-3" /> DOCX
+                    </Button>
+                  )}
+                  {selectedModule === 'odd' && entDelivs.find((x: any) => x.type === 'odd_excel') && (
+                    <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1"
+                      onClick={() => handleDownloadOddExcelCoach(entDelivs)}>
+                      <Download className="h-3 w-3" /> XLSM
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {renderDeliverableContent(selectedDeliv) || (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
