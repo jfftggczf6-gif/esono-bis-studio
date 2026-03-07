@@ -865,6 +865,22 @@ export default function CoachDashboard() {
         title={ent.name}
         subtitle={`${ent.sector || 'Secteur non défini'} • ${ent.country || ''}`}
       >
+        {/* Generation overlay */}
+        {(generating || generatingMirror) && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-card border border-border rounded-2xl p-8 shadow-2xl text-center max-w-sm">
+              <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+              <p className="font-bold text-lg">Génération en cours…</p>
+              {generationProgress && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  {generationProgress.name} ({generationProgress.current}/{generationProgress.total})
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground mt-3">Veuillez patienter, ne quittez pas cette page</p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
