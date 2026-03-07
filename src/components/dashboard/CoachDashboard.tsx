@@ -37,6 +37,16 @@ const MODULE_CONFIG = [
   { code: 'odd',           title: 'Due Diligence ODD',           icon: Target,          color: '#0891b2' },
 ];
 
+const MIRROR_MODULES = [
+  { code: 'diagnostic', title: 'Diagnostic Expert Global', shortTitle: 'Diagnostic Expert Global', icon: Stethoscope, color: 'bg-orange-100 text-orange-600', step: 1 },
+  { code: 'bmc', title: 'Business Model Canvas', shortTitle: 'Business Model Canvas', icon: LayoutGrid, color: 'bg-emerald-100 text-emerald-600', step: 2 },
+  { code: 'sic', title: 'Social Impact Canvas', shortTitle: 'Social Impact Canvas', icon: Globe, color: 'bg-teal-100 text-teal-600', step: 3 },
+  { code: 'framework', title: 'Plan Financier Intermédiaire', shortTitle: 'Plan Financier Intermédiaire', icon: BarChart3, color: 'bg-purple-100 text-purple-600', step: 4 },
+  { code: 'plan_ovo', title: 'Plan Financier Final', shortTitle: 'Plan Financier Final', icon: ListChecks, color: 'bg-amber-100 text-amber-600', step: 5 },
+  { code: 'business_plan', title: 'Business Plan', shortTitle: 'Business Plan', icon: FileText, color: 'bg-indigo-100 text-indigo-600', step: 6 },
+  { code: 'odd', title: 'ODD', shortTitle: 'ODD', icon: Target, color: 'bg-red-100 text-red-600', step: 7 },
+];
+
 const DELIV_MAP: Record<string, string> = {
   bmc: 'bmc_analysis', sic: 'sic_analysis', inputs: 'inputs_data',
   framework: 'framework_data', diagnostic: 'diagnostic_data',
