@@ -20,6 +20,7 @@ import {
 import BmcViewer from './BmcViewer';
 import SicViewer from './SicViewer';
 import DeliverableViewer from './DeliverableViewer';
+import BusinessPlanPreview from './BusinessPlanPreview';
 
 const MODULE_CONFIG = [
   { code: 'diagnostic' as const, title: 'Diagnostic Expert Global', shortTitle: 'Diagnostic Expert Global', icon: Stethoscope, color: 'bg-orange-100 text-orange-600', step: 1 },
@@ -39,7 +40,7 @@ const DELIVERABLE_CONFIG = [
   { type: 'framework_data', label: 'Plan Financier Intermédiaire', formats: ['html', 'xlsx'], icon: '📈' },
   { type: 'diagnostic_data', label: 'Diagnostic Expert', formats: ['html', 'json'], icon: '🩺' },
   { type: 'plan_ovo', label: 'Plan Financier Final', formats: ['html', 'xlsx'], icon: '📋' },
-  { type: 'business_plan', label: 'Business Plan', formats: ['html', 'json'], icon: '📄' },
+  { type: 'business_plan', label: 'Business Plan', formats: ['html', 'json', 'docx'], icon: '📄' },
   { type: 'odd_analysis', label: 'Due Diligence ODD', formats: ['html', 'json'], icon: '✅' },
 ];
 
@@ -568,6 +569,29 @@ export default function EntrepreneurDashboard() {
     }
   };
 
+  const handleDownloadBpWord = async (url: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(url, {
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      if (!response.ok) throw new Error('Erreur de téléchargement');
+      const blob = await response.blob();
+      const bpDeliv = deliverables.find((d: any) => d.type === 'business_plan');
+      const fileName = (bpDeliv?.data as any)?._meta?.file_name || `${enterprise?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'entreprise'}_BusinessPlan.docx`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      toast.success('Business Plan Word téléchargé !');
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur de téléchargement');
+    }
+  };
+
   // Classify uploaded files
   const docFiles = uploadedFiles.filter(f => /\.(docx?|pdf|txt)$/i.test(f.name));
   const finFiles = uploadedFiles.filter(f => /\.(xlsx?|csv)$/i.test(f.name));
@@ -847,12 +871,60 @@ export default function EntrepreneurDashboard() {
               </div>
             )}
 
+            {/* Green bar for Business Plan module */}
+            {selectedModule === 'business_plan' && (
+              <div className="mx-6 mt-4 mb-2 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-indigo-900">Business Plan OVO (Word)</p>
+                      <p className="text-xs text-indigo-600">Génère un BP complet au format OVO avec fichier Word téléchargeable</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {generatingModule === 'business_plan' ? (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Génération en cours… (30-90 secondes)
+                      </div>
+                    ) : selectedDeliv?.data?._meta?.download_url ? (
+                      <>
+                        <button
+                          onClick={() => handleDownloadBpWord(selectedDeliv.data._meta.download_url)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Télécharger Word (.docx)
+                        </button>
+                        <button
+                          onClick={() => handleGenerateModule('business_plan')}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-indigo-700 border border-indigo-300 text-xs font-semibold hover:bg-indigo-50 transition-colors"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" /> Regénérer
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerateModule('business_plan')}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" /> Générer le Business Plan
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedDeliv?.data && typeof selectedDeliv.data === 'object' ? (
               <div className="p-6">
                 {selectedModule === 'bmc' ? (
                   <BmcViewer data={selectedDeliv.data} />
                 ) : selectedModule === 'sic' ? (
                   <SicViewer data={selectedDeliv.data} />
+                ) : selectedModule === 'business_plan' ? (
+                  <BusinessPlanPreview data={selectedDeliv.data as Record<string, any>} />
                 ) : (
                   <DeliverableViewer moduleCode={selectedModule} data={selectedDeliv.data} />
                 )}
