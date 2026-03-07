@@ -535,7 +535,8 @@ function buildUserPrompt(data: EntrepreneurData): string {
 
   // ── Extract structured revenue data from framework/plan_ovo ──
   const fw = (data.framework_data || {}) as Record<string, any>;
-  const prevPlan = (data.plan_ovo_data || {}) as Record<string, any>;
+  const rawPrevPlan = (data.plan_ovo_data || {}) as Record<string, any>;
+  const prevPlan = sanitizePrevPlan(rawPrevPlan); // ← sanitize stale data
   const inp = (data.inputs_data || {}) as Record<string, any>;
   const cr = inp.compte_resultat || {};
   const bmc = (data.bmc_data || {}) as Record<string, any>;
