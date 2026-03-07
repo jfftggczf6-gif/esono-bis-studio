@@ -151,7 +151,7 @@ export default function EntrepreneurDashboard() {
     { name: "ODD", fn: "generate-odd", type: "odd_analysis" },
   ];
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (force = false) => {
     if (!enterprise) return;
     setGenerating(true);
     let completed = 0;
@@ -166,9 +166,9 @@ export default function EntrepreneurDashboard() {
         const step = PIPELINE[i];
         setGenerationProgress({ current: i + 1, total: PIPELINE.length, name: step.name });
 
-        // Skip if deliverable already exists with rich data
+        // Skip if deliverable already exists with rich data (unless force=true)
         const existing = deliverables.find(d => d.type === step.type);
-        if (existing?.data && typeof existing.data === 'object' && Object.keys(existing.data as object).length > 0) {
+        if (!force && existing?.data && typeof existing.data === 'object' && Object.keys(existing.data as object).length > 0) {
           completed++;
           if (existing.score) scores.push(existing.score);
           continue;
@@ -909,7 +909,7 @@ export default function EntrepreneurDashboard() {
       <div className="fixed bottom-20 left-0 z-50 px-4">
         <Button
           size="lg"
-          onClick={handleGenerate}
+          onClick={() => handleGenerate(true)}
           disabled={generating}
           className="gap-3 rounded-xl shadow-lg bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 text-white px-5 py-3 h-auto"
         >
