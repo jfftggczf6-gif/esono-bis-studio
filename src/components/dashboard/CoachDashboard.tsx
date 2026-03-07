@@ -87,7 +87,7 @@ export default function CoachDashboard() {
     { name: "ODD", fn: "generate-odd", type: "odd_analysis" },
   ];
 
-  const handleGenerateAll = async (enterpriseId: string) => {
+  const handleGenerateAll = async (enterpriseId: string, force = false) => {
     setGenerating(true);
     let completed = 0;
     const scores: number[] = [];
@@ -103,7 +103,7 @@ export default function CoachDashboard() {
         setGenerationProgress({ current: i + 1, total: PIPELINE.length, name: step.name });
 
         const existing = delivs.find((d: any) => d.type === step.type);
-        if (existing?.data && typeof existing.data === 'object' && Object.keys(existing.data as object).length > 0) {
+        if (!force && existing?.data && typeof existing.data === 'object' && Object.keys(existing.data as object).length > 0) {
           completed++;
           if (existing.score) scores.push(existing.score);
           continue;
