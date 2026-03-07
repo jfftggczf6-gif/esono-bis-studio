@@ -71,6 +71,9 @@ export default function EntrepreneurDashboard() {
   const [editLegalForm, setEditLegalForm] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [extractedInfo, setExtractedInfo] = useState<{ name: string | null; country: string | null; sector: string | null } | null>(null);
+  const [showExtractDialog, setShowExtractDialog] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const finInputRef = useRef<HTMLInputElement>(null);
   const extraInputRef = useRef<HTMLInputElement>(null);
