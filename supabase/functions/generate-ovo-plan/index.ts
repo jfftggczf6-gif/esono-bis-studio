@@ -323,6 +323,7 @@ async function callClaudeAPI(data: EntrepreneurData): Promise<Record<string, unk
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
+        signal: AbortSignal.timeout(90000), // fail-fast après 90s
         headers: {
           "Content-Type": "application/json",
           "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
@@ -330,7 +331,7 @@ async function callClaudeAPI(data: EntrepreneurData): Promise<Record<string, unk
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 32768,
+          max_tokens: 16384, // 16K suffisant pour le JSON financier
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         }),
@@ -864,10 +865,13 @@ function buildCellWrites(json: Record<string, any>): CellWrite[] {
   }
 
   // Helper pour écrire 10 valeurs dans les colonnes O→X
+  // Col S = CURRENT YEAR = formule auto dans FinanceData (ex: Q+R, Q201+R201)
+  // Elle est calculée automatiquement par Excel → NE JAMAIS écrire S directement
   function wFinance(sheet: string, row: number, values: number[], skipCols: string[] = []) {
     const cols = ["O","P","Q","R","S","T","U","V","W","X"];
+    const skip = new Set(["S", ...skipCols]);
     cols.forEach((col, i) => {
-      if (!skipCols.includes(col)) {
+      if (!skip.has(col)) {
         w(sheet, row, col, values[i] ?? 0, "number");
       }
     });
@@ -1113,12 +1117,13 @@ function buildCellWrites(json: Record<string, any>): CellWrite[] {
         (["H1","H2","CURRENT YEAR"].includes(period) && y.year === "CURRENT YEAR")
       ) || { headcount:0, gross_monthly_salary_per_person:0, annual_allowances_per_person:0 };
 
-      // Bug #2: Skip col S for headcount (S = formula (Q+R)/2, auto-calculated by Excel)
+      // Skip col S pour TOUTES les lignes staff (headcount, salary, allowances)
+      // S = formule (Q+R)/2 dans le template → auto-calculé depuis H1(Q) + H2(R)
       if (finCols[i] !== "S") {
-        w("FinanceData", rows.eft,      finCols[i], Math.round(yr.headcount || 0),                        "number");
+        w("FinanceData", rows.eft,        finCols[i], Math.round(yr.headcount || 0),                        "number");
+        w("FinanceData", rows.salary,     finCols[i], yr.gross_monthly_salary_per_person || 0,              "number");
+        w("FinanceData", rows.allowances, finCols[i], yr.annual_allowances_per_person    || 0,              "number");
       }
-      w("FinanceData", rows.salary,     finCols[i], yr.gross_monthly_salary_per_person || 0,              "number");
-      w("FinanceData", rows.allowances, finCols[i], yr.annual_allowances_per_person    || 0,              "number");
     });
   });
 
