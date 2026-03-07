@@ -16,7 +16,6 @@ import { toast } from 'sonner';
 const MODULE_CONFIG = [
   { code: 'bmc' as const, title: 'Business Model Canvas', icon: LayoutGrid },
   { code: 'sic' as const, title: 'Social Impact Canvas', icon: Globe },
-  { code: 'inputs' as const, title: 'Données Financières', icon: FileSpreadsheet },
   { code: 'framework' as const, title: 'Plan Financier Intermédiaire', icon: BarChart3 },
   { code: 'diagnostic' as const, title: 'Diagnostic Expert', icon: Stethoscope },
   { code: 'plan_ovo' as const, title: 'Plan Financier Final', icon: ListChecks },
