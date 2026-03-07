@@ -190,6 +190,9 @@ Deno.serve(async (req: Request) => {
     // Bug #4: Normalize range data (shift r3/r2 → r1 if only one range used)
     normalizeRangeData(financialJson);
 
+    // Post-expansion validation: fill any remaining zero-volume gaps
+    validateAndFillVolumes(financialJson);
+
     // Bug #7: Sort products/services by slot for consistent ordering
     if (Array.isArray(financialJson.products)) {
       financialJson.products.sort((a: any, b: any) => (a.slot || 0) - (b.slot || 0));
