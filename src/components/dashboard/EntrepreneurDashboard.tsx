@@ -20,6 +20,7 @@ import {
 import BmcViewer from './BmcViewer';
 import SicViewer from './SicViewer';
 import DeliverableViewer from './DeliverableViewer';
+import BusinessPlanPreview from './BusinessPlanPreview';
 
 const MODULE_CONFIG = [
   { code: 'diagnostic' as const, title: 'Diagnostic Expert Global', shortTitle: 'Diagnostic Expert Global', icon: Stethoscope, color: 'bg-orange-100 text-orange-600', step: 1 },
