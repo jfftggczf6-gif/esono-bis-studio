@@ -1,26 +1,44 @@
 
 
-# Plan : Deployer generate-plan-ovo et regenerer les donnees
+# Plan : Forcer la regeneration du Plan OVO
 
-## Diagnostic
+## Probleme
 
-Le probleme est confirme : **la fonction `generate-plan-ovo` n'a jamais ete redeployee** apres les corrections de code. Les logs montrent "No logs found" pour cette fonction, et les donnees en base sont toujours sur l'ancien schema :
-- `base_year: 2023`, `current_year: 2024`, annees 2022-2029
-- Aucune contrainte framework injectee (le bug `poste` vs `libelle` n'a jamais ete corrige en production)
+Deux blocages empechent la mise a jour du Plan OVO :
 
-Le code source est correct (annees dynamiques, extraction `poste || libelle`), mais il tourne encore en local — jamais deploye.
+1. **Pipeline global** (`handleGenerate`, ligne 170-175) : skippe tout module qui a deja des donnees riches. Comme `plan_ovo` a des donnees (anciennes, base_year 2023), il est systematiquement ignore.
 
-## Actions
+2. **Pipeline global ne supporte pas `force`** : contrairement a `generate-deliverables` (edge function), le frontend n'envoie jamais `force: true` pour ecraser les donnees existantes.
 
-### 1. Deployer la fonction `generate-plan-ovo`
-Utiliser `supabase--deploy_edge_functions` pour deployer la version corrigee qui contient :
-- Annees dynamiques (`new Date().getFullYear()` = 2026, donc 2024-2031)
-- Extraction framework avec `l.poste || l.libelle`
-- Contraintes numeriques injectees dans le prompt
-- Normalizer `normalizePlanOvo` applique apres la generation
+La generation individuelle (`handleGenerateModule`) devrait fonctionner mais les logs montrent 0 appels reussis, ce qui suggere un probleme cote frontend (erreur silencieuse ou mauvais mapping).
 
-### 2. Verifier le deploiement
-Tester la fonction deployee pour confirmer qu'elle repond sans erreur.
+## Corrections
 
-Apres deploiement, il suffira de regenerer le module Plan OVO depuis le dashboard pour obtenir des donnees avec les bonnes annees (2024-2031) et des revenus coherents avec le Plan Financier Intermediaire.
+### 1. Ajouter un parametre `force` a la generation globale
+
+Dans `EntrepreneurDashboard.tsx` et `CoachDashboard.tsx`, modifier `handleGenerate` pour accepter un parametre `force` qui ignore le check de donnees existantes :
+
+```typescript
+const handleGenerate = async (force = false) => {
+  // ...
+  // Ligne 170-175 : ajouter condition force
+  if (!force && existing?.data && ...) {
+    continue; // skip
+  }
+```
+
+Connecter le bouton de regeneration globale existant pour passer `force: true` quand l'utilisateur clique explicitement sur "Regenerer".
+
+### 2. Verifier le mapping individuel
+
+S'assurer que quand l'utilisateur clique sur le bouton de regeneration du module Plan OVO, la fonction `generate-plan-ovo` est bien appelee et les erreurs sont correctement affichees (pas d'erreur silencieuse).
+
+### 3. Appliquer la meme correction dans CoachDashboard
+
+Meme logique de `force` pour le dashboard coach.
+
+## Impact
+- Un fichier principal modifie : `EntrepreneurDashboard.tsx` (~5 lignes)
+- Un fichier secondaire : `CoachDashboard.tsx` (~5 lignes)  
+- Apres correction, relancer la generation globale ou individuelle produira un nouveau Plan OVO avec les annees 2024-2031 et les contraintes framework
 
