@@ -149,6 +149,27 @@ export default function CoachDashboard() {
     }
   };
 
+  const handleDownloadCoachingReport = async (enterpriseId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non authentifié");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-deliverable?type=coaching_report&enterprise_id=${enterpriseId}&format=html`;
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!response.ok) throw new Error('Erreur');
+      const blob = await response.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `rapport_coaching.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      toast.success('Rapport coaching téléchargé !');
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   const handleDownload = async (type: string, enterpriseId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
