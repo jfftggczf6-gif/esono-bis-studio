@@ -14,45 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      coach_uploads: {
+        Row: {
+          category: string
+          coach_id: string
+          created_at: string
+          enterprise_id: string
+          file_size: number | null
+          filename: string
+          id: string
+          storage_path: string
+        }
+        Insert: {
+          category: string
+          coach_id: string
+          created_at?: string
+          enterprise_id: string
+          file_size?: number | null
+          filename: string
+          id?: string
+          storage_path: string
+        }
+        Update: {
+          category?: string
+          coach_id?: string
+          created_at?: string
+          enterprise_id?: string
+          file_size?: number | null
+          filename?: string
+          id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_uploads_enterprise_id_fkey"
+            columns: ["enterprise_id"]
+            isOneToOne: false
+            referencedRelation: "enterprises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deliverables: {
         Row: {
           ai_generated: boolean | null
+          coach_id: string | null
           created_at: string
           data: Json | null
           enterprise_id: string
           file_url: string | null
+          generated_by: string | null
           html_content: string | null
           id: string
           score: number | null
+          shared_at: string | null
           type: Database["public"]["Enums"]["deliverable_type"]
           updated_at: string
           version: number
+          visibility: string | null
         }
         Insert: {
           ai_generated?: boolean | null
+          coach_id?: string | null
           created_at?: string
           data?: Json | null
           enterprise_id: string
           file_url?: string | null
+          generated_by?: string | null
           html_content?: string | null
           id?: string
           score?: number | null
+          shared_at?: string | null
           type: Database["public"]["Enums"]["deliverable_type"]
           updated_at?: string
           version?: number
+          visibility?: string | null
         }
         Update: {
           ai_generated?: boolean | null
+          coach_id?: string | null
           created_at?: string
           data?: Json | null
           enterprise_id?: string
           file_url?: string | null
+          generated_by?: string | null
           html_content?: string | null
           id?: string
           score?: number | null
+          shared_at?: string | null
           type?: Database["public"]["Enums"]["deliverable_type"]
           updated_at?: string
           version?: number
+          visibility?: string | null
         }
         Relationships: [
           {
@@ -109,15 +162,21 @@ export type Database = {
         Row: {
           city: string | null
           coach_id: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           country: string | null
           created_at: string
           creation_date: string | null
           description: string | null
           employees_count: number | null
           id: string
+          last_activity: string | null
           legal_form: string | null
           logo_url: string | null
           name: string
+          phase: string | null
+          score_ir: number | null
           sector: string | null
           updated_at: string
           uploaded_files: Json | null
@@ -126,15 +185,21 @@ export type Database = {
         Insert: {
           city?: string | null
           coach_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           country?: string | null
           created_at?: string
           creation_date?: string | null
           description?: string | null
           employees_count?: number | null
           id?: string
+          last_activity?: string | null
           legal_form?: string | null
           logo_url?: string | null
           name: string
+          phase?: string | null
+          score_ir?: number | null
           sector?: string | null
           updated_at?: string
           uploaded_files?: Json | null
@@ -143,15 +208,21 @@ export type Database = {
         Update: {
           city?: string | null
           coach_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           country?: string | null
           created_at?: string
           creation_date?: string | null
           description?: string | null
           employees_count?: number | null
           id?: string
+          last_activity?: string | null
           legal_form?: string | null
           logo_url?: string | null
           name?: string
+          phase?: string | null
+          score_ir?: number | null
           sector?: string | null
           updated_at?: string
           uploaded_files?: Json | null
