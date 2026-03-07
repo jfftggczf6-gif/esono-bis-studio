@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, selectedRole?: AppRole) => {
+    skipRoleFetch.current = true;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -78,8 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: window.location.origin,
       },
     });
-    if (error) throw error;
-    // With auto-confirm, user is immediately authenticated — set role now
+    if (error) {
+      skipRoleFetch.current = false;
+      throw error;
+    }
     if (data.user) {
       const role = selectedRole || 'entrepreneur';
       await supabase.from('user_roles').upsert(
@@ -88,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       setRoleState(role);
     }
+    skipRoleFetch.current = false;
   };
 
   const signIn = async (email: string, password: string) => {
