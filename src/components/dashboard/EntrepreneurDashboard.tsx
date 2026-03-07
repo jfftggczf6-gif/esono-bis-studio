@@ -63,6 +63,7 @@ export default function EntrepreneurDashboard() {
     throw new Error("Session expirée — redirection vers la connexion");
   };
   const navigate = useNavigate();
+  const [initialLoading, setInitialLoading] = useState(true);
   const [enterprise, setEnterprise] = useState<any>(null);
   const [modules, setModules] = useState<any[]>([]);
   const [deliverables, setDeliverables] = useState<any[]>([]);
