@@ -718,18 +718,16 @@ ${productInstructions}
 ${serviceInstructions}
 3. Au minimum 1 catégorie de staff (STAFF_CAT01)
 4. CAPEX réaliste pour les immobilisations nécessaires
-5. Prévisions sur 8 années (YEAR-2 à YEAR6)
-6. Scénario : TYPICAL_CASE
+5. Scénario : TYPICAL_CASE
+6. CHAQUE produit/service actif DOIT avoir volume_cy > 0
 
-CONTRAINTES DE COHÉRENCE ABSOLUES :
-- Les revenus historiques et projetés ci-dessus sont des DONNÉES RÉELLES — le total revenue par année DOIT correspondre
-- Pour chaque produit actif : volume = CA_produit / prix_unitaire, volume_h1 = volume × 0.45, volume_h2 = volume × 0.55
-- La SOMME des CA de tous les produits actifs DOIT correspondre au revenue total de chaque année
-- Les données YEAR-2 et YEAR-1 NE SONT PAS zéro si l'entreprise a un historique — utilise les données ci-dessus
+CONTRAINTES DE COHÉRENCE :
+- Les revenus historiques ci-dessus sont des DONNÉES RÉELLES — volume_cy × price_cy DOIT correspondre au CA
 - Répartis le CA total entre les produits selon les % indiqués dans REVENUS PAR PRODUIT
-- Les OPEX, COGS, CAPEX et STAFF doivent être cohérents avec les données du plan intermédiaire ci-dessus
+- YEAR-2 et YEAR-1 ne sont PAS zéro si l'entreprise a un historique
+- Les OPEX, CAPEX et STAFF doivent être cohérents avec les données du plan intermédiaire ci-dessus
 
-JSON SCHEMA ATTENDU :
+JSON SCHEMA CONDENSÉ ATTENDU :
 {
   "company": "string",
   "country": "string (en anglais)",
@@ -740,72 +738,46 @@ JSON SCHEMA ATTENDU :
   "tax_regime_1": 0.04,
   "tax_regime_2": 0.30,
   "years": {
-    "year_minus_2": ${cy-2},
-    "year_minus_1": ${cy-1},
-    "current_year": ${cy},
-    "year2": ${cy+1},
-    "year3": ${cy+2},
-    "year4": ${cy+3},
-    "year5": ${cy+4},
-    "year6": ${cy+5}
+    "year_minus_2": ${cy-2}, "year_minus_1": ${cy-1}, "current_year": ${cy},
+    "year2": ${cy+1}, "year3": ${cy+2}, "year4": ${cy+3}, "year5": ${cy+4}, "year6": ${cy+5}
   },
   "ranges": [
-    {"slot": 1, "name": "LOW END", "description": ""},
-    {"slot": 2, "name": "MEDIUM END", "description": ""},
-    {"slot": 3, "name": "HIGH END", "description": ""}
+    {"slot": 1, "name": "LOW END"}, {"slot": 2, "name": "MEDIUM END"}, {"slot": 3, "name": "HIGH END"}
   ],
   "channels": [
-    {"slot": 1, "name": "B2B", "description": ""},
-    {"slot": 2, "name": "B2C", "description": ""}
+    {"slot": 1, "name": "B2B"}, {"slot": 2, "name": "B2C"}
   ],
   "products": [
     {
-      "slot": 1,
-      "name": "Nom produit",
-      "active": true,
-      "description": "description",
-      "range_flags": [1, 0, 0],
-      "channel_flags": [0, 1],
-      "per_year": [
-        {
-          "year": "YEAR-2",
-          "unit_price_r1": 0, "unit_price_r2": 0, "unit_price_r3": 0,
-          "mix_r1": 1.0, "mix_r2": 0, "mix_r3": 0,
-          "cogs_r1": 0, "cogs_r2": 0, "cogs_r3": 0,
-          "mix_r1_ch1": 0, "mix_r2_ch1": 0, "mix_r3_ch1": 0,
-          "mix_r1_ch2": 1.0, "mix_r2_ch2": 0, "mix_r3_ch2": 0,
-          "volume_h1": 0, "volume_h2": 0, "volume_q3": 0, "volume_q4": 0
-        }
-        // ... 7 autres années
-      ]
+      "slot": 1, "name": "Nom produit", "active": true, "description": "...",
+      "range_flags": [1, 0, 0], "channel_flags": [0, 1],
+      "price_cy": 12000, "cogs_rate": 0.35,
+      "volume_ym2": 0, "volume_ym1": 0, "volume_cy": 5000,
+      "growth_rate": 0.20, "price_growth": 0.03
     }
-    // ... jusqu'à 20 slots (inactifs si pas de produit)
   ],
-  "services": [ /* même structure, jusqu'à 10 slots */ ],
+  "services": [ /* même structure condensée que products */ ],
   "staff": [
     {
-      "category_id": "STAFF_CAT01",
-      "occupational_category": "EMPLOYE(E)S",
-      "department": "DIRECTION",
-      "social_security_rate": 0.1645,
-      "per_year": [
-        {"year": "YEAR-2", "headcount": 0, "gross_monthly_salary_per_person": 0, "annual_allowances_per_person": 0}
-        // ... 7 autres années
-      ]
+      "category_id": "STAFF_CAT01", "occupational_category": "EMPLOYE(E)S",
+      "department": "DIRECTION", "social_security_rate": 0.1645,
+      "headcount_by_year": [0, 1, 2, 2, 3, 3, 4, 4],
+      "monthly_salary_cy": 400000, "salary_growth": 0.05,
+      "annual_allowances_cy": 50000
     }
   ],
   "capex": [
     {"type": "OFFICE_EQUIPMENT", "slot": 1, "label": "Ordinateurs", "acquisition_year": ${cy}, "acquisition_value": 500000, "amortisation_rate": 0.333}
   ],
   "opex": {
-    "marketing": {"research": [0,0,0,0,0,0,0,0,0,0], "advertising": [0,0,0,0,0,0,0,0,0,0], "receptions": [0,0,0,0,0,0,0,0,0,0], "purchase_studies": [0,0,0,0,0,0,0,0,0,0], "documentation": [0,0,0,0,0,0,0,0,0,0]},
-    "taxes_on_staff": {"salaries_tax": [0,0,0,0,0,0,0,0,0,0], "apprenticeship": [0,0,0,0,0,0,0,0,0,0], "training": [0,0,0,0,0,0,0,0,0,0], "other": [0,0,0,0,0,0,0,0,0,0]},
-    "office": {"rent": [0,0,0,0,0,0,0,0,0,0], "internet": [0,0,0,0,0,0,0,0,0,0], "telecom": [0,0,0,0,0,0,0,0,0,0], "supplies": [0,0,0,0,0,0,0,0,0,0], "fuel": [0,0,0,0,0,0,0,0,0,0], "water": [0,0,0,0,0,0,0,0,0,0], "electricity": [0,0,0,0,0,0,0,0,0,0], "cleaning": [0,0,0,0,0,0,0,0,0,0]},
-    "other": {"health": [0,0,0,0,0,0,0,0,0,0], "directors": [0,0,0,0,0,0,0,0,0,0], "donations": [0,0,0,0,0,0,0,0,0,0]},
-    "travel": {"nb_travellers": [0,0,0,0,0,0,0,0,0,0], "avg_cost": [0,0,0,0,0,0,0,0,0,0]},
-    "insurance": {"building": [0,0,0,0,0,0,0,0,0,0], "company": [0,0,0,0,0,0,0,0,0,0]},
-    "maintenance": {"movable": [0,0,0,0,0,0,0,0,0,0], "other": [0,0,0,0,0,0,0,0,0,0]},
-    "third_parties": {"legal": [0,0,0,0,0,0,0,0,0,0], "accounting": [0,0,0,0,0,0,0,0,0,0], "transport": [0,0,0,0,0,0,0,0,0,0], "commissions": [0,0,0,0,0,0,0,0,0,0], "delivery": [0,0,0,0,0,0,0,0,0,0]}
+    "marketing": {"total_cy": 1500000, "growth": 0.10},
+    "taxes_on_staff": {"total_cy": 200000, "growth": 0.05},
+    "office": {"total_cy": 800000, "growth": 0.05},
+    "other": {"total_cy": 100000, "growth": 0.03},
+    "travel": {"nb_travellers_cy": 3, "avg_cost_cy": 200000, "growth": 0.05},
+    "insurance": {"total_cy": 300000, "growth": 0.03},
+    "maintenance": {"total_cy": 200000, "growth": 0.05},
+    "third_parties": {"total_cy": 600000, "growth": 0.08}
   },
   "working_capital": {
     "stock_days": [0, 0, 45, 45, 45, 45, 60, 60, 60, 60],
