@@ -15,7 +15,7 @@ import {
   Stethoscope, ListChecks, FileText, Target,
   Plus, Building2, Upload, Sparkles, Download,
   LogOut, User, Clock, CheckCircle2, Loader2, X, FileUp,
-  BookOpen, Lock, FolderPlus
+  BookOpen, Lock, FolderPlus, Pencil
 } from 'lucide-react';
 import BmcViewer from './BmcViewer';
 import SicViewer from './SicViewer';
@@ -63,6 +63,14 @@ export default function EntrepreneurDashboard() {
   const [generatingOvoPlan, setGeneratingOvoPlan] = useState(false);
   const [ovoDownloadUrl, setOvoDownloadUrl] = useState<string | null>(null);
   const [selectedModule, setSelectedModule] = useState<string>('business_plan');
+  const [showEdit, setShowEdit] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSector, setEditSector] = useState('');
+  const [editCountry, setEditCountry] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editLegalForm, setEditLegalForm] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [saving, setSaving] = useState(false);
   const docInputRef = useRef<HTMLInputElement>(null);
   const finInputRef = useRef<HTMLInputElement>(null);
   const extraInputRef = useRef<HTMLInputElement>(null);
@@ -283,8 +291,41 @@ export default function EntrepreneurDashboard() {
       setCreating(false);
     }
   };
+  const openEditDialog = () => {
+    if (!enterprise) return;
+    setEditName(enterprise.name || '');
+    setEditSector(enterprise.sector || '');
+    setEditCountry(enterprise.country || '');
+    setEditCity(enterprise.city || '');
+    setEditLegalForm(enterprise.legal_form || '');
+    setEditDescription(enterprise.description || '');
+    setShowEdit(true);
+  };
 
-  const getModuleData = (code: string) => {
+  const saveEnterprise = async () => {
+    if (!enterprise || !editName.trim()) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('enterprises').update({
+        name: editName.trim(),
+        sector: editSector.trim() || null,
+        country: editCountry.trim() || null,
+        city: editCity.trim() || null,
+        legal_form: editLegalForm.trim() || null,
+        description: editDescription.trim() || null,
+      }).eq('id', enterprise.id);
+      if (error) throw error;
+      toast.success('Entreprise mise à jour !');
+      setShowEdit(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
     const mod = modules.find((m: any) => m.module === code);
     return { status: (mod?.status || 'not_started') as 'not_started' | 'in_progress' | 'completed', progress: mod?.progress || 0 };
   };
@@ -665,7 +706,13 @@ export default function EntrepreneurDashboard() {
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* ===== TOP HEADER ===== */}
       <header className="flex-none h-14 border-b border-border bg-card flex items-center px-6 z-50">
-        <span className="font-display font-bold text-lg tracking-tight mr-auto">ESONO</span>
+        <span className="font-display font-bold text-lg tracking-tight">ESONO</span>
+        <span className="mx-3 text-muted-foreground">·</span>
+        <span className="text-sm font-medium text-foreground">{enterprise.name}</span>
+        <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={openEditDialog}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <div className="mr-auto" />
         <div className="flex items-center gap-4">
           <span className="text-sm text-foreground">
             {profile?.full_name} · <span className="text-muted-foreground">{profile?.email}</span>
@@ -676,7 +723,26 @@ export default function EntrepreneurDashboard() {
         </div>
       </header>
 
-      {/* ===== INVESTMENT READINESS BAR ===== */}
+      {/* ===== EDIT ENTERPRISE DIALOG ===== */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-display">Modifier l'entreprise</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-1.5"><Label>Nom *</Label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Secteur</Label><Input value={editSector} onChange={e => setEditSector(e.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Pays</Label><Input value={editCountry} onChange={e => setEditCountry(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Ville</Label><Input value={editCity} onChange={e => setEditCity(e.target.value)} /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Forme juridique</Label><Input value={editLegalForm} onChange={e => setEditLegalForm(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Description</Label><Input value={editDescription} onChange={e => setEditDescription(e.target.value)} /></div>
+            <Button className="w-full" onClick={saveEnterprise} disabled={saving || !editName.trim()}>
+              {saving ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex-none h-12 bg-[hsl(222,47%,15%)] flex items-center px-6 gap-6">
         <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/60">Investment Readiness</span>
         <span className="text-2xl font-display font-bold text-white">{globalScore > 0 ? `${globalScore}/100` : '—/100'}</span>
